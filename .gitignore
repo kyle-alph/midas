@@ -1,0 +1,4 @@
+.env
+*.db # SQLite decision log
+PAUSED # pause file
+state.json
