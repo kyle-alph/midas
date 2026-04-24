@@ -1,0 +1,6 @@
+coinbase-advanced-py
+anthropic
+pandas
+pandas-ta
+twilio
+python-dotenv

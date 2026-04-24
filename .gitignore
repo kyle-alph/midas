@@ -2,3 +2,8 @@
 *.db # SQLite decision log
 PAUSED # pause file
 state.json
+.idea/
+*.iml
+.idea/
+*.iml
+.envrc
