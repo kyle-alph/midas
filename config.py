@@ -45,7 +45,7 @@ PAUSE_CHECK_INTERVAL_SEC       = 30
 DAILY_RESET_HOUR               = 9
 
 # Claude model
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+CLAUDE_MODEL = "claude-sonnet-4-6"
 
 # Alerting
 HOURLY_SUMMARY_ENABLED = True   # Only fires if trades occurred that hour
