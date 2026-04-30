@@ -131,7 +131,7 @@ class DecisionLog:
     def print_recent(self, n: int = 20, trades_only: bool = False) -> None:
         query = "SELECT * FROM decisions"
         if trades_only:
-            query += " WHERE strategy_signal IN ('BUY', 'SELL')"
+            query += " WHERE strategy_signal = 'BUY' OR strategy_signal LIKE 'SELL_%'"
         query += " ORDER BY id DESC LIMIT ?"
         with self._conn() as conn:
             rows = conn.execute(query, (n,)).fetchall()
