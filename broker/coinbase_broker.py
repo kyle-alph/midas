@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from coinbase.rest import RESTClient
@@ -118,11 +119,14 @@ class CoinbaseBroker:
                   "current_value_usd", "unrealized_pnl"}
         Uses average cost basis across all fills for current open position.
         """
-        # Fetch recent filled buy orders for the symbol
+        # Fetch recent filled buy orders for the symbol, scoped to last 24h
+        # to exclude prior account history outside this agent's trading window
+        start_date = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
         orders = self._client.list_orders(
             product_id=symbol,
             order_status=["FILLED"],
             order_side="BUY",
+            start_date=start_date,
         )
 
         total_btc = 0.0
@@ -140,6 +144,7 @@ class CoinbaseBroker:
             product_id=symbol,
             order_status=["FILLED"],
             order_side="SELL",
+            start_date=start_date,
         )
         for order in sell_orders.get("orders", []):
             filled_size = float(order.get("filled_size", 0))
