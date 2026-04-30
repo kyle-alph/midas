@@ -6,9 +6,6 @@ import config
 
 logger = logging.getLogger(__name__)
 
-_TELEGRAM_URL = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage"
-
-
 class Notifier:
 
     def send_halt_alert(self, reason: str, daily_state) -> None:
@@ -50,9 +47,10 @@ class Notifier:
         if config.DRY_RUN:
             logger.info("[DRY_RUN] Telegram suppressed: %s", message)
             return
+        url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage"
         try:
             resp = requests.post(
-                _TELEGRAM_URL,
+                url,
                 json={"chat_id": config.TELEGRAM_CHAT_ID, "text": message},
                 timeout=10,
             )
