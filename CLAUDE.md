@@ -23,7 +23,7 @@ decisions are explicitly placeholder and must not be finalized without review.
 | Indicators | `pandas` + `pandas-ta` (RSI, SMA) |
 | Database | SQLite (stdlib) — `decisions.db` in project root |
 | Deployment | DigitalOcean Ubuntu 22.04, systemd (`midas.service`) |
-| Alerting | Twilio SMS |
+| Alerting | Telegram Bot API |
 
 ---
 
@@ -42,7 +42,7 @@ Midas/
 ├── agent/claude_agent.py   # Periodic Claude assessment (every 30 min)
 ├── risk/risk_manager.py    # Hard enforcement — last gate before any order
 ├── logger/decision_log.py  # SQLite append-only; writes every loop iteration
-├── alerts/notifier.py      # Twilio SMS
+├── alerts/notifier.py      # Telegram Bot API
 ├── state/daily_state.py    # Intraday tracking; resets at 9AM; persists to state.json
 └── midas.service           # systemd unit file
 ```
@@ -60,8 +60,8 @@ Each iteration (1-second tick):
 6. Strategy signal: sell check if position open; buy check if Claude is favorable
 7. Risk gate (`RiskManager`) — hard caps, never bypassed
 8. Execute order via `CoinbaseBroker`
-9. Hourly SMS summary (only if trades occurred)
-10. EoD SMS summary (8AM, before 9AM reset)
+9. Hourly Telegram summary (only if trades occurred)
+10. EoD Telegram summary (8AM, before 9AM reset)
 11. Log everything to SQLite — including holds
 
 ---
@@ -109,7 +109,7 @@ These are explicitly unresolved. Scaffold stubs exist; do not implement a real a
 - Domain-driven repo structure
 - SQLite for Phase 1 (Postgres migration path is low overhead when needed)
 - Daily cap frozen at 9AM — intraday profits do not increase it
-- Twilio SMS: hourly (if trades), EoD at 8AM, halt-only immediate
+- Telegram: hourly (if trades), EoD at 8AM, halt-only immediate
 - DECISIONS.md is append-only — never overwrite
 
 ---

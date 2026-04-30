@@ -1,9 +1,10 @@
+import asyncio
 import logging
 
-from twilio.rest import Client
+from telegram import Bot
+from telegram.error import TelegramError
 
 import config
-from state.daily_state import DailyState
 
 logger = logging.getLogger(__name__)
 
@@ -11,52 +12,55 @@ logger = logging.getLogger(__name__)
 class Notifier:
 
     def __init__(self) -> None:
-        self._client = Client(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN)
+        self._bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
+        self._chat_id = config.TELEGRAM_CHAT_ID
 
-    def send_halt_alert(self, reason: str, daily_state: DailyState) -> None:
-        """Immediate SMS on halt condition."""
-        body = (
-            f"[HALT] {reason} | "
-            f"Loss: ${daily_state.realized_loss_today:.2f} | "
-            f"Cap: ${daily_state.daily_cap:.2f} | "
+    def send_halt_alert(self, reason: str, daily_state) -> None:
+        msg = (
+            f"🛑 *MIDAS HALTED*\n"
+            f"Reason: {reason}\n"
+            f"Loss today: ${daily_state.realized_loss_today:.2f}\n"
+            f"Cap: ${daily_state.daily_cap:.2f}\n"
             f"Trades: {daily_state.trade_count_today}"
         )
-        self._send(body)
+        self._send(msg)
 
-    def send_hourly_summary(self, daily_state: DailyState, trades_this_hour: list) -> None:
-        """Send only if trades occurred this hour."""
+    def send_hourly_summary(self, daily_state, trades_this_hour: list) -> None:
         if not trades_this_hour:
             return
-        body = (
-            f"[HOURLY] {len(trades_this_hour)} trade(s) | "
-            f"PnL: ${daily_state.net_pnl_today():+.2f} | "
-            f"Deployed: ${daily_state.deployed_today:.2f}/${daily_state.daily_cap:.2f} | "
-            f"Halted: {'Y' if daily_state.halted else 'N'}"
+        msg = (
+            f"📊 *MIDAS HOURLY*\n"
+            f"Trades this hour: {len(trades_this_hour)}\n"
+            f"PnL today: ${daily_state.net_pnl_today():.2f}\n"
+            f"Deployed: ${daily_state.deployed_today:.2f} / ${daily_state.daily_cap:.2f}\n"
+            f"Halted: {'Yes' if daily_state.halted else 'No'}"
         )
-        self._send(body)
+        self._send(msg)
 
-    def send_eod_summary(self, daily_state: DailyState) -> None:
-        """Sent at EOD_SUMMARY_HOUR (8AM) before 9AM reset."""
-        body = (
-            f"[EOD] {daily_state.date} | "
-            f"Trades: {daily_state.trade_count_today} | "
-            f"PnL: ${daily_state.net_pnl_today():+.2f} | "
-            f"Profit: ${daily_state.realized_profit_today:.2f} | "
-            f"Loss: ${daily_state.realized_loss_today:.2f} | "
-            f"Deployed: ${daily_state.deployed_today:.2f}"
+    def send_eod_summary(self, daily_state) -> None:
+        msg = (
+            f"🌙 *MIDAS END OF DAY*\n"
+            f"Trades: {daily_state.trade_count_today}\n"
+            f"PnL: ${daily_state.net_pnl_today():.2f}\n"
+            f"Deployed: ${daily_state.deployed_today:.2f}\n"
+            f"Halted today: {'Yes' if daily_state.halted else 'No'}"
         )
-        self._send(body)
+        self._send(msg)
 
-    def _send(self, body: str) -> None:
+    def send_test(self) -> None:
+        self._send("✅ *Midas is alive* — Telegram alerts working")
+
+    def _send(self, message: str) -> None:
         if config.DRY_RUN:
-            logger.info("[DRY_RUN] SMS suppressed: %s", body)
+            logger.info("[DRY_RUN] Telegram suppressed: %s", message)
             return
         try:
-            msg = self._client.messages.create(
-                body=body,
-                from_=config.TWILIO_FROM_NUMBER,
-                to=config.TWILIO_TO_NUMBER,
-            )
-            logger.info("SMS sent: sid=%s", msg.sid)
+            asyncio.run(self._bot.send_message(
+                chat_id=self._chat_id,
+                text=message,
+                parse_mode="Markdown",
+            ))
+        except TelegramError as exc:
+            logger.error("[Notifier] Telegram send failed: %s", exc)
         except Exception as exc:
-            logger.error("SMS send failed: %s", exc)
+            logger.error("[Notifier] Unexpected error: %s", exc)

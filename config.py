@@ -6,10 +6,8 @@ load_dotenv()
 COINBASE_API_KEY    = os.getenv("COINBASE_API_KEY")
 COINBASE_API_SECRET = os.getenv("COINBASE_API_SECRET")
 ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY")
-TWILIO_ACCOUNT_SID  = os.getenv("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN   = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_FROM_NUMBER  = os.getenv("TWILIO_FROM_NUMBER")
-TWILIO_TO_NUMBER    = os.getenv("TWILIO_TO_NUMBER")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID")
 
 # Runtime flags
 DRY_RUN    = os.getenv("DRY_RUN", "true").lower() == "true"
