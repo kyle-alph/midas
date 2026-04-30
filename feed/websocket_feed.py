@@ -23,6 +23,8 @@ class WebSocketFeed:
         self._symbol = symbol
         self._lock = threading.Lock()
         self._latest_price: Optional[float] = None
+        self._last_candle_close: Optional[float] = None
+        self._current_candle_bucket: Optional[int] = None  # floor(unix_ts / 300)
         self._thread: Optional[threading.Thread] = None
         self._running = False
         self._backoff = config.WEBSOCKET_RECONNECT_DELAY_SEC
@@ -45,9 +47,10 @@ class WebSocketFeed:
             return self._latest_price
 
     def get_reference_price(self) -> Optional[float]:
-        # TK: reference price mode is a pending decision (see DECISIONS.md).
-        # Stub: return latest tick price until REFERENCE_PRICE_MODE is decided.
-        return self.get_latest_price()
+        # last_candle: close of the most recent completed 5-min candle.
+        # Falls back to latest tick if no candle has closed yet this session.
+        with self._lock:
+            return self._last_candle_close if self._last_candle_close is not None else self._latest_price
 
     # ------------------------------------------------------------------ #
     # Background loop                                                      #
@@ -92,7 +95,6 @@ class WebSocketFeed:
     def _on_message(self, msg: str) -> None:
         try:
             data = json.loads(msg)
-            # Coinbase ticker events carry channel="ticker" and events list
             if data.get("channel") != "ticker":
                 return
             for event in data.get("events", []):
@@ -100,7 +102,13 @@ class WebSocketFeed:
                     price_str = tick.get("price")
                     if price_str:
                         price = float(price_str)
+                        bucket = int(time.time()) // 300  # 5-min bucket
                         with self._lock:
+                            if (self._current_candle_bucket is not None
+                                    and bucket != self._current_candle_bucket):
+                                # 5-min window just rolled — last price was the candle close
+                                self._last_candle_close = self._latest_price
+                            self._current_candle_bucket = bucket
                             self._latest_price = price
         except (json.JSONDecodeError, ValueError, KeyError):
             pass

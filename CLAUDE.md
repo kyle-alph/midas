@@ -85,13 +85,17 @@ All strategy thresholds are placeholders. Do not treat as final. Recalibrate aft
 
 These are explicitly unresolved. Scaffold stubs exist; do not implement a real approach without a decision logged to DECISIONS.md.
 
-- **Reference price source** (`REFERENCE_PRICE_MODE`) — options: session open, last 5-min candle close, last Claude assessment price. Currently stubbed: `get_reference_price()` returns latest price.
 - **Claude assessment cadence** — 30 min is a configurable assumption, not final.
 - **Double-down logic** — `should_double_down()` stubs `False`. Pending strategic decision.
 - **Final strategy** — Option 1 (dip-buy) is Phase 1 learning vehicle only.
   - Option 2 TK: volume filter on dip confirmation (require volume > 20-candle avg)
   - Option 3 TK: regime detection (1h price vs 4h SMA), switch signal logic
 - **Strategy thresholds** — all values marked `# PLACEHOLDER` in config.py and strategy/
+
+## Resolved Decisions
+
+- **Claude model** — `claude-sonnet-4-6` (was outdated scaffold value `claude-sonnet-4-20250514`)
+- **Reference price source** — `last_candle`: close of most recent completed 5-min candle, derived from WebSocket tick stream. Falls back to latest tick for the first 5 min after agent start. Rationale: triggers most frequently for Phase 1 data collection. See DECISIONS.md.
 
 ---
 

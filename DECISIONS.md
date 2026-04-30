@@ -32,9 +32,22 @@ Comparing different timeframes reveals if short-term move is with or against tre
 
 ---
 
+## Reference Price: last_candle
+*Decided April 2026*
+
+Dip is measured against the close of the most recent completed 5-min candle.
+- `session_open`: drifts stale intraday; triggers too infrequently for Phase 1 data collection
+- `last_claude`: 30-min staleness; no trades fire before first Claude call each session
+- `last_candle`: reactive to short-term momentum reversals; triggers most frequently; aligns with Phase 1 goal of logging decisions, not profit
+- **Verdict:** `last_candle`. Revisit if Week 1 logs show over-triggering in downtrends.
+
+Falls back to latest tick price for the first 5 minutes after agent start (before first candle close).
+
+---
+
 ## Open TK Decisions
 
-- [ ] Reference price for dip detection (session open? last 5-min candle? last Claude price?)
+- [x] Reference price for dip detection → `last_candle` (see entry below)
 - [ ] Final strategy — Option 1 is placeholder only
 - [ ] Claude assessment cadence — 30 min assumed, may change with final strategy
 - [ ] Double-down logic — stubbed as False pending strategic decision

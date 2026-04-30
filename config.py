@@ -36,7 +36,7 @@ STOP_LOSS_PCT     = -0.008   # -0.8%: stop loss below avg entry
 # TK: Reference price source for dip detection — decision pending
 # Options: session open price, last 5-min candle close, last Claude assessment price
 # DO NOT hardcode a specific approach — scaffold as configurable
-REFERENCE_PRICE_MODE = os.getenv("REFERENCE_PRICE_MODE", "TK")
+REFERENCE_PRICE_MODE = os.getenv("REFERENCE_PRICE_MODE", "last_candle")
 
 # Loop timing
 WEBSOCKET_RECONNECT_DELAY_SEC  = 5
