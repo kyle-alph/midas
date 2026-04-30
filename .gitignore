@@ -1,6 +1,6 @@
 .env
-*.db # SQLite decision log
-PAUSED # pause file
+*.db
+PAUSED
 state.json
 .idea/
 *.iml
