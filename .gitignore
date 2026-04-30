@@ -7,3 +7,5 @@ state.json
 .idea/
 *.iml
 .envrc
+__pycache__/
+

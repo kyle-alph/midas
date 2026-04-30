@@ -31,8 +31,6 @@ DIP_THRESHOLD_PCT = -0.002   # -0.2%: buy trigger
 TAKE_PROFIT_PCT   =  0.0015  # +0.15%: sell trigger above avg entry
 STOP_LOSS_PCT     = -0.008   # -0.8%: stop loss below avg entry
 
-# TK: Reference price source for dip detection — decision pending
-# Options: session open price, last 5-min candle close, last Claude assessment price
 # DO NOT hardcode a specific approach — scaffold as configurable
 REFERENCE_PRICE_MODE = os.getenv("REFERENCE_PRICE_MODE", "last_candle")
 
