@@ -40,7 +40,7 @@ def cmd_status() -> None:
     pnl_sign = "+" if pnl >= 0 else ""
 
     print("── Midas Status ──────────────────────────────")
-    print(f"Phase: {config.PHASE}    DRY_RUN: {str(config.DRY_RUN).lower()}")
+    print(f"Phase: {config.PHASE}    DRY_RUN: {str(config.DRY_RUN).lower()}    Paper trading: {str(config.PAPER_TRADING).lower()}")
     print(f"Date:  {state.date}")
     print(
         f"Cap:   ${state.daily_cap:.2f}  "

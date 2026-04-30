@@ -17,7 +17,7 @@ class CoinbaseBroker:
             api_key=config.COINBASE_API_KEY,
             api_secret=config.COINBASE_API_SECRET,
         )
-        self._paper_position: Optional[dict] = None  # DRY_RUN only
+        self._paper_position: Optional[dict] = None  # PAPER_TRADING only
 
     # ------------------------------------------------------------------ #
     # Account                                                              #
@@ -54,14 +54,14 @@ class CoinbaseBroker:
     def place_market_buy(self, symbol: str, usd_amount: float) -> dict:
         """
         Place market buy for usd_amount USD.
-        DRY_RUN: log and return a fake filled dict, never raise.
+        PAPER_TRADING: log and return a fake filled dict, never raise.
         Returns: {"order_id", "filled_size", "avg_filled_price", "usd_spent", "status"}
         """
         if config.PAPER_TRADING:
             fake_price = self.get_current_price(symbol)
             filled_size = usd_amount / fake_price
             logger.info(
-                "[DRY_RUN] BUY %s | $%.2f | ~%.8f BTC @ $%.2f",
+                "[PAPER] BUY %s | $%.2f | ~%.8f BTC @ $%.2f",
                 symbol, usd_amount, filled_size, fake_price,
             )
             if self._paper_position is None:
@@ -96,14 +96,14 @@ class CoinbaseBroker:
     def place_market_sell(self, symbol: str, btc_amount: float) -> dict:
         """
         Place market sell for btc_amount BTC.
-        DRY_RUN: log and return a fake filled dict, never raise.
+        PAPER_TRADING: log and return a fake filled dict, never raise.
         Returns: {"order_id", "filled_value", "avg_filled_price", "btc_sold", "status"}
         """
         if config.PAPER_TRADING:
             fake_price = self.get_current_price(symbol)
             filled_value = btc_amount * fake_price
             logger.info(
-                "[DRY_RUN] SELL %s | %.8f BTC @ $%.2f | ~$%.2f",
+                "[PAPER] SELL %s | %.8f BTC @ $%.2f | ~$%.2f",
                 symbol, btc_amount, fake_price, filled_value,
             )
             self._paper_position = None

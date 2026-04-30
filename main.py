@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     logger.info(
-        "Midas starting — phase=%d dry_run=%s symbol=%s",
-        config.PHASE, config.DRY_RUN, config.SYMBOL,
+        "Midas starting — phase=%d dry_run=%s paper_trading=%s symbol=%s",
+        config.PHASE, config.DRY_RUN, config.PAPER_TRADING, config.SYMBOL,
     )
 
     broker      = CoinbaseBroker()
