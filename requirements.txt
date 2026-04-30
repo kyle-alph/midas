@@ -2,5 +2,4 @@ coinbase-advanced-py
 anthropic
 pandas
 pandas-ta
-python-telegram-bot
 python-dotenv

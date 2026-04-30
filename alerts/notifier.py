@@ -1,23 +1,19 @@
-import asyncio
 import logging
 
-from telegram import Bot
-from telegram.error import TelegramError
+import requests
 
 import config
 
 logger = logging.getLogger(__name__)
 
+_TELEGRAM_URL = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage"
+
 
 class Notifier:
 
-    def __init__(self) -> None:
-        self._bot = Bot(token=config.TELEGRAM_BOT_TOKEN)
-        self._chat_id = config.TELEGRAM_CHAT_ID
-
     def send_halt_alert(self, reason: str, daily_state) -> None:
         msg = (
-            f"🛑 *MIDAS HALTED*\n"
+            f"🛑 MIDAS HALTED\n"
             f"Reason: {reason}\n"
             f"Loss today: ${daily_state.realized_loss_today:.2f}\n"
             f"Cap: ${daily_state.daily_cap:.2f}\n"
@@ -29,7 +25,7 @@ class Notifier:
         if not trades_this_hour:
             return
         msg = (
-            f"📊 *MIDAS HOURLY*\n"
+            f"📊 MIDAS HOURLY\n"
             f"Trades this hour: {len(trades_this_hour)}\n"
             f"PnL today: ${daily_state.net_pnl_today():.2f}\n"
             f"Deployed: ${daily_state.deployed_today:.2f} / ${daily_state.daily_cap:.2f}\n"
@@ -39,7 +35,7 @@ class Notifier:
 
     def send_eod_summary(self, daily_state) -> None:
         msg = (
-            f"🌙 *MIDAS END OF DAY*\n"
+            f"🌙 MIDAS END OF DAY\n"
             f"Trades: {daily_state.trade_count_today}\n"
             f"PnL: ${daily_state.net_pnl_today():.2f}\n"
             f"Deployed: ${daily_state.deployed_today:.2f}\n"
@@ -48,19 +44,19 @@ class Notifier:
         self._send(msg)
 
     def send_test(self) -> None:
-        self._send("✅ *Midas is alive* — Telegram alerts working")
+        self._send("✅ Midas is alive — Telegram alerts working")
 
     def _send(self, message: str) -> None:
         if config.DRY_RUN:
             logger.info("[DRY_RUN] Telegram suppressed: %s", message)
             return
         try:
-            asyncio.run(self._bot.send_message(
-                chat_id=self._chat_id,
-                text=message,
-                parse_mode="Markdown",
-            ))
-        except TelegramError as exc:
-            logger.error("[Notifier] Telegram send failed: %s", exc)
-        except Exception as exc:
-            logger.error("[Notifier] Unexpected error: %s", exc)
+            resp = requests.post(
+                _TELEGRAM_URL,
+                json={"chat_id": config.TELEGRAM_CHAT_ID, "text": message},
+                timeout=10,
+            )
+            if not resp.ok:
+                logger.error("[Notifier] Telegram error %d: %s", resp.status_code, resp.text)
+        except requests.RequestException as exc:
+            logger.error("[Notifier] Telegram request failed: %s", exc)
