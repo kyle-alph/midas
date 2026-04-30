@@ -7,9 +7,9 @@ from logger.decision_log import DecisionLog
 from state.daily_state import DailyState
 
 
-def cmd_logs(n: int) -> None:
+def cmd_logs(n: int, trades_only: bool = False) -> None:
     log = DecisionLog()
-    log.print_recent(n)
+    log.print_recent(n, trades_only=trades_only)
 
 
 def cmd_status() -> None:
@@ -63,13 +63,14 @@ def main() -> None:
 
     logs_parser = subparsers.add_parser("logs", help="Show recent decision log entries")
     logs_parser.add_argument("--n", type=int, default=20, help="Number of entries to show")
+    logs_parser.add_argument("--trades-only", action="store_true", help="Show only BUY/SELL entries")
 
     subparsers.add_parser("status", help="Show current daily state")
 
     args = parser.parse_args()
 
     if args.command == "logs":
-        cmd_logs(args.n)
+        cmd_logs(args.n, trades_only=args.trades_only)
     elif args.command == "status":
         cmd_status()
     else:

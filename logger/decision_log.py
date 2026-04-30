@@ -128,11 +128,13 @@ class DecisionLog:
                 ),
             )
 
-    def print_recent(self, n: int = 20) -> None:
+    def print_recent(self, n: int = 20, trades_only: bool = False) -> None:
+        query = "SELECT * FROM decisions"
+        if trades_only:
+            query += " WHERE strategy_signal IN ('BUY', 'SELL')"
+        query += " ORDER BY id DESC LIMIT ?"
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM decisions ORDER BY id DESC LIMIT ?", (n,)
-            ).fetchall()
+            rows = conn.execute(query, (n,)).fetchall()
             cols = [d[0] for d in conn.execute("SELECT * FROM decisions LIMIT 0").description]
 
         rows.reverse()
