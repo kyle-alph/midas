@@ -69,6 +69,11 @@ class ClaudeAgent:
                 messages=[{"role": "user", "content": user_content}],
             )
             text = response.content[0].text.strip()
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+                text = text.strip()
             result = json.loads(text)
 
             # Clamp threshold to safe range
@@ -135,15 +140,17 @@ class ClaudeAgent:
                     end=str(int(time.time())),
                     granularity=granularity,
                 )
-                candles_raw = resp.get("candles", [])
+                candles_raw = resp.candles if hasattr(resp, "candles") else resp.get("candles", [])
                 if candles_raw:
-                    df = pd.DataFrame(candles_raw)
-                    df["close"] = df["close"].astype(float)
-                    df["open"] = df["open"].astype(float)
-                    df["high"] = df["high"].astype(float)
-                    df["low"] = df["low"].astype(float)
-                    df["volume"] = df["volume"].astype(float)
-                    df["start"] = pd.to_datetime(df["start"].astype(int), unit="s")
+                    df = pd.DataFrame([{
+                        "start":  int(c.start) if hasattr(c, "start") else c["start"],
+                        "open":   float(c.open if hasattr(c, "open") else c["open"]),
+                        "high":   float(c.high if hasattr(c, "high") else c["high"]),
+                        "low":    float(c.low if hasattr(c, "low") else c["low"]),
+                        "close":  float(c.close if hasattr(c, "close") else c["close"]),
+                        "volume": float(c.volume if hasattr(c, "volume") else c["volume"]),
+                    } for c in candles_raw])
+                    df["start"] = pd.to_datetime(df["start"], unit="s")
                     df = df.sort_values("start").reset_index(drop=True)
                     result[key] = df
             except Exception as exc:
