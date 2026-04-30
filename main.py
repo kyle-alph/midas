@@ -39,9 +39,9 @@ def main() -> None:
 
     last_claude_call  = 0.0
     claude_assessment = None
-    last_hourly_alert = time.time()
+    last_hourly_alert = datetime.now().replace(minute=0, second=0, microsecond=0).timestamp()
     trades_this_hour: list = []
-    eod_sent_today    = False
+    eod_sent_today    = datetime.now().hour >= config.EOD_SUMMARY_HOUR
     snapshot          = None
 
     while True:
@@ -77,11 +77,11 @@ def main() -> None:
 
         # 6. Strategy signal
         #    TK: reference price source is a pending decision (see DECISIONS.md)
-        signal = "hold"
+        signal = "HOLD"
         if position:
             should_sell, reason = detector.should_sell(current_price, position)
             if should_sell:
-                signal = f"sell_{reason}"
+                signal = f"SELL_{reason.upper()}"
         else:
             if claude_assessment and claude_assessment["favorable_to_trade"]:
                 threshold       = claude_assessment.get(
@@ -91,7 +91,7 @@ def main() -> None:
                 if detector.should_buy(
                     current_price, reference_price, daily_state, position, threshold
                 ):
-                    signal = "buy"
+                    signal = "BUY"
 
         # 7. Risk check → execute
         risk_approved    = False
@@ -109,7 +109,7 @@ def main() -> None:
                 trade_executed = True
                 trades_this_hour.append(order)
 
-        elif signal.startswith("sell_"):
+        elif signal.startswith("SELL_"):
             risk_approved, rejection_reason = risk.can_sell(position, daily_state)
             if risk_approved and position:
                 order = broker.place_market_sell(config.SYMBOL, position["btc_amount"])
