@@ -10,14 +10,15 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID")
 
 # Runtime flags
-DRY_RUN    = os.getenv("DRY_RUN", "true").lower() == "true"
-PHASE      = int(os.getenv("PHASE", "1"))
+DRY_RUN       = os.getenv("DRY_RUN", "true").lower() == "true"
+PAPER_TRADING = os.getenv("PAPER_TRADING", "false").lower() == "true"
+PHASE         = int(os.getenv("PHASE", "1"))
 SYMBOL     = "BTC-USD"
 PAUSE_FILE = "PAUSED"
 
 # Phase 1 caps
 PHASE1_MAX_TRADE_USD        = 200.0
-PHASE1_DAILY_DEPLOYED_LIMIT = 200.0
+PHASE1_DAILY_DEPLOYED_LIMIT = 500.0
 PHASE1_DAILY_LOSS_HALT      = 100.0
 
 # Phase 2 caps (wired but inactive until PHASE=2)

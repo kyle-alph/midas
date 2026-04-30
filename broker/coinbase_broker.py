@@ -17,6 +17,7 @@ class CoinbaseBroker:
             api_key=config.COINBASE_API_KEY,
             api_secret=config.COINBASE_API_SECRET,
         )
+        self._paper_position: Optional[dict] = None  # DRY_RUN only
 
     # ------------------------------------------------------------------ #
     # Account                                                              #
@@ -56,13 +57,27 @@ class CoinbaseBroker:
         DRY_RUN: log and return a fake filled dict, never raise.
         Returns: {"order_id", "filled_size", "avg_filled_price", "usd_spent", "status"}
         """
-        if config.DRY_RUN:
+        if config.PAPER_TRADING:
             fake_price = self.get_current_price(symbol)
             filled_size = usd_amount / fake_price
             logger.info(
                 "[DRY_RUN] BUY %s | $%.2f | ~%.8f BTC @ $%.2f",
                 symbol, usd_amount, filled_size, fake_price,
             )
+            if self._paper_position is None:
+                self._paper_position = {
+                    "btc_amount": filled_size,
+                    "avg_entry_price": fake_price,
+                    "cost_basis": usd_amount,
+                }
+            else:
+                new_btc = self._paper_position["btc_amount"] + filled_size
+                new_cost = self._paper_position["cost_basis"] + usd_amount
+                self._paper_position = {
+                    "btc_amount": new_btc,
+                    "avg_entry_price": new_cost / new_btc,
+                    "cost_basis": new_cost,
+                }
             return {
                 "order_id": f"dry-{uuid.uuid4()}",
                 "filled_size": filled_size,
@@ -84,13 +99,14 @@ class CoinbaseBroker:
         DRY_RUN: log and return a fake filled dict, never raise.
         Returns: {"order_id", "filled_value", "avg_filled_price", "btc_sold", "status"}
         """
-        if config.DRY_RUN:
+        if config.PAPER_TRADING:
             fake_price = self.get_current_price(symbol)
             filled_value = btc_amount * fake_price
             logger.info(
                 "[DRY_RUN] SELL %s | %.8f BTC @ $%.2f | ~$%.2f",
                 symbol, btc_amount, fake_price, filled_value,
             )
+            self._paper_position = None
             return {
                 "order_id": f"dry-{uuid.uuid4()}",
                 "filled_value": filled_value,
@@ -119,6 +135,20 @@ class CoinbaseBroker:
                   "current_value_usd", "unrealized_pnl"}
         Uses average cost basis across all fills for current open position.
         """
+        if config.PAPER_TRADING:
+            if self._paper_position is None:
+                return None
+            pos = self._paper_position
+            current_price = self.get_current_price(symbol)
+            current_value = pos["btc_amount"] * current_price
+            return {
+                "btc_amount": pos["btc_amount"],
+                "avg_entry_price": pos["avg_entry_price"],
+                "cost_basis": pos["cost_basis"],
+                "current_value_usd": current_value,
+                "unrealized_pnl": current_value - pos["cost_basis"],
+            }
+
         # Fetch recent filled buy orders for the symbol, scoped to last 24h
         # to exclude prior account history outside this agent's trading window
         start_date = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()

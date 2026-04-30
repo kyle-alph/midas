@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS decisions (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     ts                    TEXT NOT NULL,
     phase                 INTEGER NOT NULL,
-    dry_run               INTEGER NOT NULL,
+    paper_trading         INTEGER NOT NULL,
     current_price         REAL,
     market_snapshot       TEXT,
     claude_assessment     TEXT,
@@ -88,7 +88,7 @@ class DecisionLog:
             conn.execute(
                 """
                 INSERT INTO decisions (
-                    ts, phase, dry_run, current_price,
+                    ts, phase, paper_trading, current_price,
                     market_snapshot, claude_assessment, claude_reasoning,
                     strategy_signal, risk_approved, risk_rejection_reason,
                     trade_executed, trade_usd_amount, order_id, fill_price,
@@ -103,7 +103,7 @@ class DecisionLog:
                 (
                     ts,
                     config.PHASE,
-                    int(config.DRY_RUN),
+                    int(config.PAPER_TRADING),
                     current_price,
                     json.dumps(market_snapshot) if market_snapshot else None,
                     json.dumps(claude_assessment) if claude_assessment else None,

@@ -44,9 +44,6 @@ class Notifier:
         self._send("✅ Midas is alive — Telegram alerts working")
 
     def _send(self, message: str) -> None:
-        if config.DRY_RUN:
-            logger.info("[DRY_RUN] Telegram suppressed: %s", message)
-            return
         url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage"
         try:
             resp = requests.post(
