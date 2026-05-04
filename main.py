@@ -100,7 +100,7 @@ def main() -> None:
         order            = None
         balance_before   = broker.get_balance()
 
-        if signal == "buy":
+        if signal == "BUY":
             size = detector.get_trade_size(daily_state)
             risk_approved, rejection_reason = risk.can_buy(size, daily_state)
             if risk_approved:
