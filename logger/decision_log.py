@@ -61,7 +61,9 @@ class DecisionLog:
         conn.execute(_CREATE_INDEX)
 
     def _conn(self) -> sqlite3.Connection:
-        return sqlite3.connect(self._db_file)
+        conn = sqlite3.connect(self._db_file, timeout=30)
+        conn.execute("PRAGMA journal_mode=WAL")
+        return conn
 
     def write(
         self,
