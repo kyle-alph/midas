@@ -1,6 +1,6 @@
 import json
 import logging
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime, date
 
 import config
@@ -21,6 +21,7 @@ class DailyState:
     buy_count_today: int        # Individual buy executions
     halted: bool
     last_reset_date: str
+    state_file: str = field(default=STATE_FILE, compare=False)  # not persisted to JSON
 
     # ------------------------------------------------------------------ #
     # Computed helpers                                                     #
@@ -53,13 +54,17 @@ class DailyState:
     # Reset logic                                                          #
     # ------------------------------------------------------------------ #
 
-    def maybe_reset(self, account_value: float) -> "DailyState":
+    def maybe_reset(
+        self,
+        account_value: float,
+        daily_cap_override: float | None = None,
+    ) -> "DailyState":
         now = datetime.now()
         today_str = date.today().isoformat()
 
         if self.date != today_str and now.hour >= config.DAILY_RESET_HOUR:
             logger.info("Daily reset triggered (date=%s → %s)", self.date, today_str)
-            new_cap = _compute_daily_cap(account_value)
+            new_cap = daily_cap_override if daily_cap_override is not None else _compute_daily_cap(account_value)
 
             # Carry-over: if open position value >= new cap, no remaining budget.
             # The caller is responsible for passing position value if needed;
@@ -76,6 +81,7 @@ class DailyState:
                 buy_count_today=0,
                 halted=False,
                 last_reset_date=self.date,
+                state_file=self.state_file,
             )
             new_state._save()
             return new_state
@@ -87,21 +93,30 @@ class DailyState:
     # ------------------------------------------------------------------ #
 
     def _save(self) -> None:
-        with open(STATE_FILE, "w") as f:
-            json.dump(asdict(self), f, indent=2)
+        data = asdict(self)
+        data.pop("state_file", None)  # not persisted; injected on load
+        with open(self.state_file, "w") as f:
+            json.dump(data, f, indent=2)
 
     @classmethod
-    def load_or_create(cls, account_value: float) -> "DailyState":
+    def load_or_create(
+        cls,
+        account_value: float,
+        state_file: str = STATE_FILE,
+        daily_cap_override: float | None = None,
+    ) -> "DailyState":
         today_str = date.today().isoformat()
         try:
-            with open(STATE_FILE) as f:
+            with open(state_file) as f:
                 data = json.load(f)
+            data["state_file"] = state_file  # inject before instantiation
             state = cls(**data)
-            # If file is from a previous day and reset hour has passed, reset now.
+            if daily_cap_override is not None:
+                state.daily_cap = daily_cap_override
             return state.maybe_reset(account_value)
         except (FileNotFoundError, KeyError, TypeError):
-            logger.info("No valid state.json found — creating fresh DailyState.")
-            cap = _compute_daily_cap(account_value)
+            logger.info("No valid %s found — creating fresh DailyState.", state_file)
+            cap = daily_cap_override if daily_cap_override is not None else _compute_daily_cap(account_value)
             state = cls(
                 date=today_str,
                 daily_cap=cap,
@@ -112,6 +127,7 @@ class DailyState:
                 buy_count_today=0,
                 halted=False,
                 last_reset_date=today_str,
+                state_file=state_file,
             )
             state._save()
             return state

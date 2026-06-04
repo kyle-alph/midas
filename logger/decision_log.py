@@ -15,6 +15,7 @@ _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS decisions (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     ts                    TEXT NOT NULL,
+    agent_id              TEXT NOT NULL DEFAULT 'default',
     phase                 INTEGER NOT NULL,
     paper_trading         INTEGER NOT NULL,
     current_price         REAL,
@@ -41,6 +42,8 @@ CREATE TABLE IF NOT EXISTS decisions (
 );
 """
 
+_CREATE_INDEX = "CREATE INDEX IF NOT EXISTS idx_decisions_agent_id ON decisions(agent_id);"
+
 
 class DecisionLog:
 
@@ -48,6 +51,14 @@ class DecisionLog:
         self._db_file = db_file
         with self._conn() as conn:
             conn.execute(_CREATE_TABLE)
+            self._migrate(conn)
+
+    def _migrate(self, conn: sqlite3.Connection) -> None:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(decisions)").fetchall()}
+        if "agent_id" not in cols:
+            conn.execute("ALTER TABLE decisions ADD COLUMN agent_id TEXT NOT NULL DEFAULT 'default'")
+            logger.info("Migrated decisions table: added agent_id column")
+        conn.execute(_CREATE_INDEX)
 
     def _conn(self) -> sqlite3.Connection:
         return sqlite3.connect(self._db_file)
@@ -66,6 +77,7 @@ class DecisionLog:
         daily_state: DailyState,
         balance_before: Optional[float] = None,
         balance_after: Optional[float] = None,
+        agent_id: str = "default",
     ) -> None:
         ts = datetime.now(timezone.utc).isoformat()
 
@@ -88,7 +100,7 @@ class DecisionLog:
             conn.execute(
                 """
                 INSERT INTO decisions (
-                    ts, phase, paper_trading, current_price,
+                    ts, agent_id, phase, paper_trading, current_price,
                     market_snapshot, claude_assessment, claude_reasoning,
                     strategy_signal, risk_approved, risk_rejection_reason,
                     trade_executed, trade_usd_amount, order_id, fill_price,
@@ -97,11 +109,12 @@ class DecisionLog:
                     deployed_today, realized_loss_today, realized_profit_today,
                     daily_cap, trade_count_today, halted
                 ) VALUES (
-                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
                 )
                 """,
                 (
                     ts,
+                    agent_id,
                     config.PHASE,
                     int(config.PAPER_TRADING),
                     current_price,
@@ -128,13 +141,29 @@ class DecisionLog:
                 ),
             )
 
-    def print_recent(self, n: int = 20, trades_only: bool = False) -> None:
-        query = "SELECT * FROM decisions"
+    def print_recent(
+        self,
+        n: int = 20,
+        trades_only: bool = False,
+        agent_id: Optional[str] = None,
+    ) -> None:
+        conditions = []
+        params: list = []
+
         if trades_only:
-            query += " WHERE strategy_signal = 'BUY' OR strategy_signal LIKE 'SELL_%'"
+            conditions.append("(strategy_signal = 'BUY' OR strategy_signal LIKE 'SELL_%')")
+        if agent_id:
+            conditions.append("agent_id = ?")
+            params.append(agent_id)
+
+        query = "SELECT * FROM decisions"
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY id DESC LIMIT ?"
+        params.append(n)
+
         with self._conn() as conn:
-            rows = conn.execute(query, (n,)).fetchall()
+            rows = conn.execute(query, params).fetchall()
             cols = [d[0] for d in conn.execute("SELECT * FROM decisions LIMIT 0").description]
 
         rows.reverse()
@@ -150,8 +179,9 @@ class DecisionLog:
             trade_marker = " [TRADE]" if executed else ""
             risk_marker = f" [REJECTED: {rejection}]" if not approved and rejection else ""
             price_str = f"${price:,.2f}" if price else "N/A"
+            aid = record.get("agent_id", "default")
 
             print(
-                f"{ts}  {signal:<20} {price_str:<14}"
+                f"{ts}  [{aid:<12}]  {signal:<20} {price_str:<14}"
                 f"{trade_marker}{risk_marker}"
             )

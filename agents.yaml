@@ -1,0 +1,30 @@
+agents:
+  - id: conservative
+    strategy: bollinger_mean_reversion
+    phase: 1
+    paper_trading: true
+    daily_cap_usd: 1000
+    max_trade_usd: 1000
+    daily_loss_halt_usd: 250
+    symbol: BTC-USD
+    params:
+      bb_period: 20
+      bb_std: 2.0
+      take_profit_pct: 0.006
+      stop_loss_pct: -0.008
+      volume_filter: false
+
+  - id: aggressive
+    strategy: momentum_breakout
+    phase: 1
+    paper_trading: true
+    daily_cap_usd: 1000
+    max_trade_usd: 1000
+    daily_loss_halt_usd: 350
+    symbol: BTC-USD
+    params:
+      bb_period: 10
+      bb_std: 1.5
+      take_profit_pct: 0.003
+      stop_loss_pct: -0.005
+      volume_filter: true

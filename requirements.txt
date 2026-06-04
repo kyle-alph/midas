@@ -3,3 +3,4 @@ anthropic
 pandas
 pandas-ta
 python-dotenv
+pyyaml>=6.0

@@ -1,0 +1,15 @@
+[Unit]
+Description=Midas Trading Orchestrator
+After=network.target
+
+[Service]
+Type=simple
+User=kyle
+WorkingDirectory=/home/kyle/Midas
+EnvironmentFile=/home/kyle/Midas/.env
+ExecStart=/home/kyle/Midas/venv/bin/python3 orchestrator.py --config agents.yaml
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

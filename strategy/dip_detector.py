@@ -24,10 +24,11 @@ class DipDetector:
     def should_buy(
         self,
         current_price: float,
-        reference_price: float,    # TK: source is a pending decision (see DECISIONS.md)
+        reference_price: float,
         daily_state: DailyState,
         position: Optional[dict],
         dip_threshold_pct: float = config.DIP_THRESHOLD_PCT,  # PLACEHOLDER
+        candles: Optional[list] = None,
     ) -> bool:
         """
         Returns True if ALL:

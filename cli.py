@@ -7,19 +7,12 @@ from logger.decision_log import DecisionLog
 from state.daily_state import DailyState
 
 
-def cmd_logs(n: int, trades_only: bool = False) -> None:
+def cmd_logs(n: int, trades_only: bool = False, agent_id: str | None = None) -> None:
     log = DecisionLog()
-    log.print_recent(n, trades_only=trades_only)
+    log.print_recent(n, trades_only=trades_only, agent_id=agent_id)
 
 
-def cmd_status() -> None:
-    try:
-        state = DailyState.load_or_create(account_value=0.0)
-    except Exception as exc:
-        print(f"Could not load state: {exc}")
-        sys.exit(1)
-
-    # Try to get live position from broker for display
+def _print_status_block(state: DailyState, label: str | None = None) -> None:
     position_line = "Position: none"
     try:
         from broker.coinbase_broker import CoinbaseBroker
@@ -38,8 +31,10 @@ def cmd_status() -> None:
     halted_str = "Yes" if state.halted else "No"
     pnl = state.net_pnl_today()
     pnl_sign = "+" if pnl >= 0 else ""
+    header = f"── Midas Status [{label}] " if label else "── Midas Status "
+    bar = "─" * 53
 
-    print("── Midas Status ──────────────────────────────")
+    print(f"{header}{bar[len(header):]}")
     print(f"Phase: {config.PHASE}    DRY_RUN: {str(config.DRY_RUN).lower()}    Paper trading: {str(config.PAPER_TRADING).lower()}")
     print(f"Date:  {state.date}")
     print(
@@ -54,7 +49,44 @@ def cmd_status() -> None:
     )
     print(f"Trades: {state.trade_count_today}      Halted: {halted_str}")
     print(position_line)
-    print("─────────────────────────────────────────────────────")
+    print(bar)
+
+
+def cmd_status(agent_id: str | None = None, show_all: bool = False) -> None:
+    if show_all:
+        import yaml
+        try:
+            with open("agents.yaml") as f:
+                data = yaml.safe_load(f)
+            for a in data["agents"]:
+                aid = a["id"]
+                state_file = f"state_{aid}.json"
+                try:
+                    state = DailyState.load_or_create(
+                        account_value=0.0, state_file=state_file
+                    )
+                    _print_status_block(state, label=aid)
+                except Exception as exc:
+                    print(f"[{aid}] Could not load state: {exc}")
+        except FileNotFoundError:
+            print("agents.yaml not found — use --all only with orchestrator setup.")
+            sys.exit(1)
+        return
+
+    if agent_id:
+        state_file = f"state_{agent_id}.json"
+        label = agent_id
+    else:
+        state_file = "state.json"
+        label = None
+
+    try:
+        state = DailyState.load_or_create(account_value=0.0, state_file=state_file)
+    except Exception as exc:
+        print(f"Could not load state: {exc}")
+        sys.exit(1)
+
+    _print_status_block(state, label=label)
 
 
 def main() -> None:
@@ -64,15 +96,18 @@ def main() -> None:
     logs_parser = subparsers.add_parser("logs", help="Show recent decision log entries")
     logs_parser.add_argument("--n", type=int, default=20, help="Number of entries to show")
     logs_parser.add_argument("--trades-only", action="store_true", help="Show only BUY/SELL entries")
+    logs_parser.add_argument("--agent", help="Filter by agent ID")
 
-    subparsers.add_parser("status", help="Show current daily state")
+    status_parser = subparsers.add_parser("status", help="Show current daily state")
+    status_parser.add_argument("--agent", help="Show state for a specific agent ID")
+    status_parser.add_argument("--all", action="store_true", help="Show status for all agents in agents.yaml")
 
     args = parser.parse_args()
 
     if args.command == "logs":
-        cmd_logs(args.n, trades_only=args.trades_only)
+        cmd_logs(args.n, trades_only=args.trades_only, agent_id=args.agent)
     elif args.command == "status":
-        cmd_status()
+        cmd_status(agent_id=args.agent, show_all=args.all)
     else:
         parser.print_help()
 

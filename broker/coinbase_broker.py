@@ -1,4 +1,5 @@
 import logging
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -7,17 +8,32 @@ from coinbase.rest import RESTClient
 
 import config
 
+_GRANULARITY_MAP = {
+    60:    "ONE_MINUTE",
+    300:   "FIVE_MINUTE",
+    900:   "FIFTEEN_MINUTE",
+    3600:  "ONE_HOUR",
+    14400: "FOUR_HOUR",
+    86400: "ONE_DAY",
+}
+
 logger = logging.getLogger(__name__)
 
 
 class CoinbaseBroker:
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        paper_trading: bool | None = None,
+        paper_position_file: Optional[str] = None,
+    ) -> None:
         self._client = RESTClient(
             api_key=config.COINBASE_API_KEY,
             api_secret=config.COINBASE_API_SECRET,
         )
-        self._paper_position: Optional[dict] = None  # PAPER_TRADING only
+        self._paper_trading = config.PAPER_TRADING if paper_trading is None else paper_trading
+        self._paper_position_file = paper_position_file
+        self._paper_position: Optional[dict] = self._load_paper_position()
 
     # ------------------------------------------------------------------ #
     # Account                                                              #
@@ -57,7 +73,7 @@ class CoinbaseBroker:
         PAPER_TRADING: log and return a fake filled dict, never raise.
         Returns: {"order_id", "filled_size", "avg_filled_price", "usd_spent", "status"}
         """
-        if config.PAPER_TRADING:
+        if self._paper_trading:
             fake_price = self.get_current_price(symbol)
             filled_size = usd_amount / fake_price
             logger.info(
@@ -78,6 +94,7 @@ class CoinbaseBroker:
                     "avg_entry_price": new_cost / new_btc,
                     "cost_basis": new_cost,
                 }
+            self._save_paper_position()
             return {
                 "order_id": f"dry-{uuid.uuid4()}",
                 "filled_size": filled_size,
@@ -99,7 +116,7 @@ class CoinbaseBroker:
         PAPER_TRADING: log and return a fake filled dict, never raise.
         Returns: {"order_id", "filled_value", "avg_filled_price", "btc_sold", "status"}
         """
-        if config.PAPER_TRADING:
+        if self._paper_trading:
             fake_price = self.get_current_price(symbol)
             filled_value = btc_amount * fake_price
             logger.info(
@@ -107,6 +124,7 @@ class CoinbaseBroker:
                 symbol, btc_amount, fake_price, filled_value,
             )
             self._paper_position = None
+            self._save_paper_position()
             return {
                 "order_id": f"dry-{uuid.uuid4()}",
                 "filled_value": filled_value,
@@ -135,7 +153,7 @@ class CoinbaseBroker:
                   "current_value_usd", "unrealized_pnl"}
         Uses average cost basis across all fills for current open position.
         """
-        if config.PAPER_TRADING:
+        if self._paper_trading:
             if self._paper_position is None:
                 return None
             pos = self._paper_position
@@ -203,8 +221,62 @@ class CoinbaseBroker:
         }
 
     # ------------------------------------------------------------------ #
+    # Market data                                                          #
+    # ------------------------------------------------------------------ #
+
+    def fetch_candles(self, symbol: str, granularity_sec: int, limit: int) -> list[dict]:
+        """
+        Returns up to `limit` most recent completed candles, oldest-first.
+        Each dict: {start (unix int), open, high, low, close, volume (floats)}.
+        """
+        granularity = _GRANULARITY_MAP.get(granularity_sec)
+        if not granularity:
+            raise ValueError(f"Unsupported granularity: {granularity_sec}s")
+        end = int(time.time())
+        start = end - granularity_sec * (limit + 2)
+        resp = self._client.get_candles(
+            product_id=symbol,
+            start=str(start),
+            end=str(end),
+            granularity=granularity,
+        )
+        candles_raw = resp.candles if hasattr(resp, "candles") else resp.get("candles", [])
+        result = [
+            {
+                "start":  int(c.start if hasattr(c, "start") else c["start"]),
+                "open":   float(c.open if hasattr(c, "open") else c["open"]),
+                "high":   float(c.high if hasattr(c, "high") else c["high"]),
+                "low":    float(c.low if hasattr(c, "low") else c["low"]),
+                "close":  float(c.close if hasattr(c, "close") else c["close"]),
+                "volume": float(c.volume if hasattr(c, "volume") else c["volume"]),
+            }
+            for c in candles_raw
+        ]
+        result.sort(key=lambda c: c["start"])
+        return result[-limit:]
+
+    # ------------------------------------------------------------------ #
     # Internal helpers                                                     #
     # ------------------------------------------------------------------ #
+
+    def _load_paper_position(self) -> Optional[dict]:
+        if not self._paper_trading or not self._paper_position_file:
+            return None
+        try:
+            import json as _json
+            with open(self._paper_position_file) as f:
+                return _json.load(f)
+        except (FileNotFoundError, ValueError):
+            return None
+
+    def _save_paper_position(self) -> None:
+        if not self._paper_position_file:
+            return
+        import json as _json
+        with open(self._paper_position_file, "w") as f:
+            _json.dump(self._paper_position, f)
+
+
 
     def _parse_order_response(self, order: dict) -> dict:
         """Parse buy order response into standard dict."""

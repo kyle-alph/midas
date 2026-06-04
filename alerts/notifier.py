@@ -8,9 +8,12 @@ logger = logging.getLogger(__name__)
 
 class Notifier:
 
+    def __init__(self, agent_id: str = "midas") -> None:
+        self._label = f"[{agent_id.upper()}]"
+
     def send_halt_alert(self, reason: str, daily_state) -> None:
         msg = (
-            f"🛑 MIDAS HALTED\n"
+            f"🛑 {self._label} HALTED\n"
             f"Reason: {reason}\n"
             f"Loss today: ${daily_state.realized_loss_today:.2f}\n"
             f"Cap: ${daily_state.daily_cap:.2f}\n"
@@ -22,7 +25,7 @@ class Notifier:
         if not trades_this_hour:
             return
         msg = (
-            f"📊 MIDAS HOURLY\n"
+            f"📊 {self._label} HOURLY\n"
             f"Trades this hour: {len(trades_this_hour)}\n"
             f"PnL today: ${daily_state.net_pnl_today():.2f}\n"
             f"Deployed: ${daily_state.deployed_today:.2f} / ${daily_state.daily_cap:.2f}\n"
@@ -32,7 +35,7 @@ class Notifier:
 
     def send_eod_summary(self, daily_state) -> None:
         msg = (
-            f"🌙 MIDAS END OF DAY\n"
+            f"🌙 {self._label} END OF DAY\n"
             f"Trades: {daily_state.trade_count_today}\n"
             f"PnL: ${daily_state.net_pnl_today():.2f}\n"
             f"Deployed: ${daily_state.deployed_today:.2f}\n"
@@ -41,7 +44,7 @@ class Notifier:
         self._send(msg)
 
     def send_test(self) -> None:
-        self._send("✅ Midas is alive — Telegram alerts working")
+        self._send(f"✅ {self._label} is alive — Telegram alerts working")
 
     def _send(self, message: str) -> None:
         url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage"
