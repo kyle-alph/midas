@@ -1,5 +1,7 @@
 # Midas — Use Cases
 
+> **Scope:** walkthrough of the original single-agent build (`main.py`). The multi-agent orchestrator follows the same per-tick flow per agent, with caps from `agents.yaml` and paper positions persisted to `paper_position_<agent_id>.json`.
+
 ## Initial Deployment
 
 **Goal:** Paper trade against live Coinbase data for a few days. Log every decision, fire real Telegram alerts, execute no real orders.

@@ -1,5 +1,18 @@
 # Midas — Claude Code Context
 
+## Current Entry Point (read first)
+
+Production entry point is the **multi-agent orchestrator**: `orchestrator.py --config agents.yaml`,
+deployed as `midas-orchestrator.service`. Each agent in `agents.yaml` runs as its own process
+(`workers/agent_worker.py`) over one shared WebSocket feed (`shared/price_feed.py`), with its own
+strategy, risk caps (`risk/agent_risk_manager.py`), state file (`state_<agent_id>.json`) and
+decision-log `agent_id`. The orchestrator restarts crashed workers with exponential backoff
+(10s → 300s), circuit-breaks after 5 crashes in 120s, and treats a heartbeat older than 60s as hung.
+
+`main.py` + `midas.service` are the original **single-agent Phase 1 build**. Sections below that
+describe the main loop, caps and DRY_RUN apply to that path; per-agent caps for the orchestrator
+live in `agents.yaml`, not `config.py`.
+
 ## What This Is
 
 Autonomous BTC-USD trading agent running 24/7 on a DigitalOcean VPS.
@@ -31,25 +44,31 @@ decisions are explicitly placeholder and must not be finalized without review.
 
 ```
 Midas/
-├── main.py                 # Orchestration loop
+├── orchestrator.py         # Multi-agent supervisor (current entry point)
+├── agents.yaml             # Per-agent strategy, caps, params
+├── workers/agent_worker.py # Per-agent loop (one process per agent)
+├── shared/price_feed.py    # Single WebSocket feed shared by all agents
+├── main.py                 # Original single-agent loop (Phase 1)
 ├── config.py               # All constants and env var loading
 ├── DECISIONS.md            # Append-only parameter justification log
 ├── pause.py                # PAUSED file checker
 ├── cli.py                  # Log viewer and status CLI
 ├── broker/coinbase_broker.py
 ├── feed/websocket_feed.py  # Background WebSocket thread; auto-reconnects
-├── strategy/dip_detector.py
+├── strategy/                # dip_detector, bollinger_mean_reversion, momentum_breakout
 ├── agent/claude_agent.py   # Periodic Claude assessment (every 30 min)
-├── risk/risk_manager.py    # Hard enforcement — last gate before any order
+├── risk/risk_manager.py    # Hard enforcement — last gate before any order (single-agent)
+├── risk/agent_risk_manager.py # Same gate, per-agent caps from agents.yaml
 ├── logger/decision_log.py  # SQLite append-only; writes every loop iteration
 ├── alerts/notifier.py      # Telegram Bot API
 ├── state/daily_state.py    # Intraday tracking; resets at 9AM; persists to state.json
-└── midas.service           # systemd unit file
+├── midas-orchestrator.service # systemd unit (current)
+└── midas.service           # systemd unit (single-agent, legacy)
 ```
 
 ---
 
-## Main Loop (main.py)
+## Main Loop (main.py — single-agent; agent_worker.py follows the same sequence per agent)
 
 Each iteration (1-second tick):
 1. Pause check (PAUSED file)
@@ -71,7 +90,7 @@ Each iteration (1-second tick):
 | Constant | Value | Meaning |
 |---|---|---|
 | `PHASE1_MAX_TRADE_USD` | $200 | Max single trade |
-| `PHASE1_DAILY_DEPLOYED_LIMIT` | $200 | Max deployed per day |
+| `PHASE1_DAILY_DEPLOYED_LIMIT` | $500 | Max deployed per day |
 | `PHASE1_DAILY_LOSS_HALT` | $100 | Auto-halt threshold |
 | `DIP_THRESHOLD_PCT` | -0.2% | Buy trigger — **PLACEHOLDER** |
 | `TAKE_PROFIT_PCT` | +0.15% | TP trigger — **PLACEHOLDER** |
@@ -81,9 +100,9 @@ All strategy thresholds are placeholders. Do not treat as final. Recalibrate aft
 
 ---
 
-## Open TK Decisions — Do Not Finalize Without Kyle
+## Former Open TK Decisions — Closed for V1
 
-These are explicitly unresolved. Scaffold stubs exist; do not implement a real approach without a decision logged to DECISIONS.md.
+Per DECISIONS.md ("V1 frozen; design moves to V2"), these are closed for V1: do not implement them in V1. They are carried into V2 design; see `docs/v2/DECISIONS.md`. Where this file and DECISIONS.md disagree, DECISIONS.md wins.
 
 - **Claude assessment cadence** — 30 min is a configurable assumption, not final.
 - **Double-down logic** — `should_double_down()` stubs `False`. Pending strategic decision.
@@ -123,10 +142,12 @@ These are explicitly unresolved. Scaffold stubs exist; do not implement a real a
 ## Running Locally
 
 ```bash
-cp .env.example .env   # fill in credentials
+# create .env: COINBASE_API_KEY, COINBASE_API_SECRET, ANTHROPIC_API_KEY,
+#             TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, PAPER_TRADING=true
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-python main.py         # DRY_RUN=true by default
+python orchestrator.py --config agents.yaml   # current
+python main.py         # single-agent; DRY_RUN=true by default
 ```
 
 CLI:
@@ -146,11 +167,11 @@ rm PAUSED       # resume
 ## VPS Deployment
 
 ```bash
-sudo cp midas.service /etc/systemd/system/
+sudo cp midas-orchestrator.service /etc/systemd/system/   # or midas.service for single-agent
 sudo systemctl daemon-reload
-sudo systemctl enable midas
-sudo systemctl start midas
-journalctl -u midas -f
+sudo systemctl enable midas-orchestrator
+sudo systemctl start midas-orchestrator
+journalctl -u midas-orchestrator -f
 ```
 
 ---
@@ -159,7 +180,7 @@ journalctl -u midas -f
 
 - System prompt is fixed — do not modify without appending rationale to DECISIONS.md.
 - Returns `{"favorable_to_trade": bool, "suggested_dip_threshold_pct": float, "reasoning": str, "confidence": str}`.
-- On any exception: returns safe default (`favorable_to_trade: True`, `confidence: low`) — Claude failure must never halt the loop.
+- On any exception: returns a **fail-open** default (`favorable_to_trade: True`, `confidence: low`) so a Claude outage never halts the loop. Acceptable for paper trading only; must become fail-closed (no new entries, exits unaffected) before live capital. See README → Known gaps.
 - Threshold clamped to [-0.005, -0.001] regardless of Claude output.
 - Candle data cached 15 min (`_CANDLE_CACHE_TTL_SEC = 900`).
 - Stub available: uncomment `return self._stub_assessment()` in `assess_market()`.

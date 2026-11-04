@@ -4,8 +4,9 @@ PAUSED
 state.json
 .idea/
 *.iml
-.idea/
-*.iml
 .envrc
 __pycache__/
+logs/
+state_*.json
+paper_position_*.json
 

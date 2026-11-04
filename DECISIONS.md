@@ -53,3 +53,8 @@ Falls back to latest tick price for the first 5 minutes after agent start (befor
 - [ ] Double-down logic — stubbed as False pending strategic decision
 
 ---
+
+## V1 frozen; design moves to V2
+*Logged November 2026*
+
+V1 stays a paper-trading build. The live-capital version is an invariants-first rebuild; see `docs/v2/DECISIONS.md`. V1's gaps (no reconciliation, non-idempotent retries, fail-open Claude gate) are structural, so retrofitting was rejected. The open TK items above are closed for V1.
